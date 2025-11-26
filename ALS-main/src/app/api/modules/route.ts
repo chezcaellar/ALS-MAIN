@@ -137,6 +137,14 @@ export async function PATCH(req: Request) {
       { returnDocument: "after", upsert: true }
     );
 
+    // Handle potential null result
+    if (!result) {
+      return NextResponse.json(
+        { success: false, error: "Failed to update module - no result returned" },
+        { status: 500 }
+      );
+    }
+
     const updatedDocument = result.value ?? {
       _id: result.lastErrorObject?.upserted || filter._id,
       ...updatePayload,
