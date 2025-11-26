@@ -156,7 +156,8 @@ export const calculateProgressStatistics = (progressRecords: Progress[]): Progre
     'Assignment': 0,
     'Activity': 0,
     'Project': 0,
-    'Participation': 0
+    'Participation': 0,
+    "Examination": 0
   };
   
   allActivities.forEach(activity => {
