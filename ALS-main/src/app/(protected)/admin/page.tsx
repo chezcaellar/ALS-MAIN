@@ -141,46 +141,6 @@ export default function AdminManagementPage() {
     }
   };
 
-  // Update master admin email (one-time utility function)
-  const updateMasterAdminEmail = async () => {
-    if (!confirm('Are you sure you want to update the master admin email from master@example.com to master01@gmail.com?')) {
-      return;
-    }
-
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
-      const authKey = process.env.NEXT_PUBLIC_AUTHKEY || '';
-      
-      if (!authKey) {
-        alert('❌ Error: Authentication key not configured. Please check your environment variables.');
-        return;
-      }
-      
-      const res = await fetch(`${baseUrl}/api/auth/update-master-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          authKey: authKey,
-          newEmail: 'master01@gmail.com'
-        })
-      });
-
-      const response = await res.json();
-      
-      if (response.success) {
-        alert(`✅ Success! Master admin email updated to master01@gmail.com`);
-        await loadAdmins(); // Reload to show updated email
-      } else {
-        alert(`❌ Error: ${response.error || 'Failed to update email'}`);
-      }
-    } catch (error) {
-      console.error('Error updating master admin email:', error);
-      alert(`❌ Error: ${error instanceof Error ? error.message : 'Failed to update email'}`);
-    }
-  };
-
   // Get barangay name by ID
   const getBarangayName = (barangayId: string) => {
     const barangay = barangays.find((b) => b._id === barangayId);
@@ -214,29 +174,18 @@ export default function AdminManagementPage() {
     setSubmitError(null);
 
     try {
-      // Prepare update data - only include fields that are provided
-      const updateData: Partial<User> = {
-        _id: editingAdmin._id,
-      };
-
-      // Only include fields that are actually provided in the form
-      if (data.firstName !== undefined) updateData.firstName = data.firstName;
-      if (data.middleName !== undefined) updateData.middleName = data.middleName;
-      if (data.lastName !== undefined) updateData.lastName = data.lastName;
-      if (data.email !== undefined) updateData.email = data.email;
-      if (data.gender !== undefined) updateData.gender = data.gender;
-      if (data.birthday !== undefined) updateData.birthday = data.birthday;
-      if (data.assignedBarangayId !== undefined) updateData.assignedBarangayId = data.assignedBarangayId;
-
       // Update admin in storage
-      await authService.updateStoredUser(updateData);
+      const success = await authService.updateStoredUser({
+        ...data,
+        _id: editingAdmin._id,
+      });
 
-      // Reload admins to show updated data
-      await loadAdmins();
-      
-      setIsEditDialogOpen(false);
-      setEditingAdmin(null);
-      editForm.reset();
+      if (success) {
+        await loadAdmins();
+        setIsEditDialogOpen(false);
+        setEditingAdmin(null);
+        editForm.reset();
+      }
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Failed to update admin"
@@ -325,20 +274,7 @@ export default function AdminManagementPage() {
           </p>
         </div>
 
-        <div className="flex gap-2">
-          {/* Update Master Admin Email Button - Only show if master admin exists with old email */}
-          {admins.some(admin => admin.role === 'master_admin' && admin.email === 'master@example.com') && (
-            <Button
-              onClick={updateMasterAdminEmail}
-              variant="outline"
-              className="bg-yellow-600 hover:bg-yellow-700 text-white border-2 border-yellow-600 hover:border-yellow-700"
-              title="Update master admin email from master@example.com to master01@gmail.com"
-            >
-              Update Master Email
-            </Button>
-          )}
-
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-600 hover:border-blue-700">
               <Plus className="h-4 w-4 mr-2" />

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/auth-store';
 import { useProgressStore } from '@/store/progress-store';
-import { ALL_BARANGAYS_ID, ALL_BARANGAYS_LABEL } from '@/store/constants';
 
 // Components
 import { BarangayTabs } from '@/components/students/barangay-tabs';
@@ -64,9 +63,6 @@ export default function ProgressPage() {
           barangays={filteredBarangays}
           selectedBarangay={selectedBarangay}
           onSelectBarangay={setSelectedBarangay}
-          showAllOption={user?.role !== 'admin'}
-          allOptionValue={ALL_BARANGAYS_ID}
-          allOptionLabel={ALL_BARANGAYS_LABEL}
         />
       )}
 

@@ -78,14 +78,8 @@ export function StudentTable({
                 <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               )}
             </TableHead>
-            <TableHead
-              className="text-white font-bold cursor-pointer"
-              onClick={() => handleSort('name')}
-            >
+            <TableHead className="text-white font-bold">
               NAME
-              {sortField === 'name' && (
-                <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-              )}
             </TableHead>
             <TableHead
               className="text-white font-bold cursor-pointer"

@@ -134,21 +134,19 @@ export async function PATCH(req: Request) {
     const result = await db.collection("modules").findOneAndUpdate(
       filter,
       { $set: updatePayload },
-      { returnDocument: "after" }
+      { returnDocument: "after", upsert: true }
     );
 
-    if (!result.value) {
-      return NextResponse.json(
-        { success: false, error: "Module not found" },
-        { status: 404 }
-      );
-    }
+    const updatedDocument = result.value ?? {
+      _id: result.lastErrorObject?.upserted || filter._id,
+      ...updatePayload,
+    };
 
     return NextResponse.json({
       success: true,
       data: {
-        ...result.value,
-        _id: result.value._id?.toString?.() ?? result.value._id
+        ...updatedDocument,
+        _id: updatedDocument._id?.toString?.() ?? updatedDocument._id,
       }
     });
   } catch (error) {

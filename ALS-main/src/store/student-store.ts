@@ -11,7 +11,6 @@ import {
   updateStudent,
   deleteStudent
 } from '@/services/api';
-import { ALL_BARANGAYS_ID } from './constants';
 
 // Initial state
 const initialState: StudentState = {
@@ -54,7 +53,7 @@ export const useStudentStore = create<{
     students: initialState,
     barangays: [],
     searchQuery: '',
-    selectedBarangay: ALL_BARANGAYS_ID, // Master admins default to all barangays
+    selectedBarangay: null,
     loadingBarangays: false,
     errorBarangays: null,
 
@@ -116,17 +115,23 @@ export const useStudentStore = create<{
           state.loadingBarangays = false;
 
           // Smart barangay selection based on user role
+          const fallbackBarangayId = barangays[0]?._id ?? null;
+
           if (user?.role === 'admin' && user?.assignedBarangayId) {
             const assignedBarangay = barangays.find(b => b._id === user.assignedBarangayId);
             if (assignedBarangay) {
               state.selectedBarangay = assignedBarangay._id;
-            } else if (barangays.length > 0) {
-              state.selectedBarangay = barangays[0]._id;
             } else {
-              state.selectedBarangay = null;
+              state.selectedBarangay = fallbackBarangayId;
             }
-          } else if (!state.selectedBarangay || state.selectedBarangay === '') {
-            state.selectedBarangay = ALL_BARANGAYS_ID;
+          } else {
+            const hasValidSelection = state.selectedBarangay
+              ? barangays.some(b => b._id === state.selectedBarangay)
+              : false;
+
+            if (!hasValidSelection) {
+              state.selectedBarangay = fallbackBarangayId;
+            }
           }
         });
 
@@ -164,8 +169,8 @@ export const useStudentStore = create<{
         // Start with all students
         let filtered = students.data;
 
-        // Always filter by barangay (since one is always selected now)
-        if (selectedBarangay && selectedBarangay !== ALL_BARANGAYS_ID) {
+        // Always filter by barangay when a selection exists
+        if (selectedBarangay) {
           filtered = filtered.filter(student => student.barangayId === selectedBarangay);
         }
 
