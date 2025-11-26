@@ -32,6 +32,7 @@ const initialState: ProgressState = {
       Activity: 0,
       Project: 0,
       Participation: 0,
+      Examination: 0,
     },
   },
   loading: false,
