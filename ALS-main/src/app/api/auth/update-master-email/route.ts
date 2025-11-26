@@ -96,6 +96,13 @@ export async function POST(req: Request) {
       _id: masterAdmin._id
     });
 
+    if (!updatedUser) {
+      return NextResponse.json(
+        { success: false, error: "Failed to fetch updated user" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: `Master admin email updated from 'master@example.com' to '${newEmail}'`,
@@ -112,4 +119,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
