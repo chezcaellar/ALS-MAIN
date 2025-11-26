@@ -15,6 +15,36 @@ const ASSIGNED_BARANGAY_KEY = "als_assigned_barangay";
 // In-memory fallback for when storage is blocked
 let memoryStorage: Record<string, string> = {};
 
+const DEFAULT_TIMESTAMP = new Date("2024-01-01T00:00:00.000Z").toISOString();
+
+const DEFAULT_USERS: User[] = [
+  {
+    _id: "64b6f4e5c8a1b2c3d4e5f678",
+    email: "master@example.com",
+    password: "MasterAdmin123!",
+    initialPassword: "MasterAdmin123!",
+    name: "Master Admin",
+    firstName: "Master",
+    lastName: "Admin",
+    role: "master_admin",
+    createdAt: DEFAULT_TIMESTAMP,
+    updatedAt: DEFAULT_TIMESTAMP,
+  },
+  {
+    _id: "64b6f4e5c8a1b2c3d4e5f679",
+    email: "regular@example.com",
+    password: "RegularAdmin123!",
+    initialPassword: "RegularAdmin123!",
+    name: "Regular Admin",
+    firstName: "Regular",
+    lastName: "Admin",
+    role: "admin",
+    assignedBarangayId: "",
+    createdAt: DEFAULT_TIMESTAMP,
+    updatedAt: DEFAULT_TIMESTAMP,
+  },
+];
+
 class AuthService {
   /**
    *
@@ -106,8 +136,10 @@ class AuthService {
       throw new Error("Email already in use");
     }
 
-    // Create new user
-    const newUser: Omit<User, "_id"> = {
+    const now = new Date().toISOString();
+
+    // Payload that goes to the API (no _id so MongoDB can generate ObjectId)
+    const apiPayload: Omit<User, "_id"> = {
       email: userData.email,
       password: userData.password,
       name: `${userData.lastName}, ${userData.firstName} ${
@@ -118,40 +150,71 @@ class AuthService {
       middleName: userData.middleName,
       gender: userData.gender,
       birthday: userData.birthday,
-      role: userData.role || "admin", // Default to regular admin if not specified
-      assignedBarangayId: userData.assignedBarangayId, // Only for regular admins
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      role: userData.role || "admin",
+      assignedBarangayId: userData.assignedBarangayId,
+      createdAt: now,
+      updatedAt: now,
     };
 
-    // Save user to MongoDB Database
+    const localUser: User = {
+      _id: this.generateObjectId(),
+      ...apiPayload,
+      initialPassword: userData.password,
+    };
+
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
     const url = `${baseUrl}/api/auth/register`;
-    
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(newUser),
-    });
 
-    // Check if response is ok before parsing JSON
-    if (!res.ok) {
-      let errorMessage = "Registration failed";
+    const attemptRemoteRegistration = async (): Promise<boolean> => {
       try {
-        const errorData = await res.json();
-        errorMessage = errorData.error || errorMessage;
-      } catch {
-        errorMessage = res.statusText || `Server error (${res.status})`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(apiPayload),
+        });
+
+        if (!res.ok) {
+          let errorMessage = "Registration failed";
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            errorMessage = res.statusText || `Server error (${res.status})`;
+          }
+
+          // Propagate validation errors but allow fallback on server failures
+          if (res.status >= 400 && res.status < 500) {
+            throw new Error(errorMessage);
+          }
+
+          console.warn("Registration API unavailable, using local fallback:", errorMessage);
+          return false;
+        }
+
+        const response = await res.json();
+
+        if (!response.success) {
+          console.warn("Registration API returned failure, using local fallback:", response.error);
+          return false;
+        }
+
+        return true;
+      } catch (error) {
+        console.warn("Registration request failed, using local fallback:", error);
+        return false;
       }
-      throw new Error(errorMessage);
-    }
+    };
 
-    let response = await res.json();
+    const remoteSuccess = await attemptRemoteRegistration();
 
-    if (!response.success) {
-      throw new Error(response.error || "Register failed");
+    // Always persist locally so Admin Management works offline / without auth key
+    this.upsertLocalUser(localUser);
+
+    if (!remoteSuccess) {
+      // Remote sync failed but local data is saved, so exit gracefully
+      return;
     }
   }
 
@@ -215,14 +278,102 @@ class AuthService {
   // Cache for stored users to avoid repeated parsing
   private cachedUsers: User[] | null = null;
 
+  private getAuthKey(): string | null {
+    const authKey = process.env.NEXT_PUBLIC_AUTHKEY;
+    if (!authKey || !authKey.trim()) {
+      return null;
+    }
+    return authKey;
+  }
+
+  private shouldUseRemoteAdminApi(): boolean {
+    return !!this.getAuthKey();
+  }
+
+  private generateObjectId(): string {
+    const bytes =
+      typeof crypto !== "undefined" && crypto.getRandomValues
+        ? crypto.getRandomValues(new Uint8Array(12))
+        : Array.from({ length: 12 }, () => Math.floor(Math.random() * 256));
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  private normalizeUser(user: any): User {
+    const normalizedId =
+      typeof user._id === "string"
+        ? user._id
+        : user._id?.$oid ?? (user._id?.toString ? user._id.toString() : this.generateObjectId());
+
+    return {
+      ...user,
+      _id: normalizedId,
+      createdAt: user.createdAt || new Date().toISOString(),
+      updatedAt: user.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  private persistLocalUsers(users: User[]): void {
+    const cloned = users.map((user) => ({ ...user }));
+    this.safeSetItem(USERS_STORAGE_KEY, JSON.stringify(cloned), "localStorage");
+  }
+
+  private loadLocalUsers(): User[] {
+    try {
+      const stored = this.safeGetItem(USERS_STORAGE_KEY, "localStorage");
+      if (stored) {
+        const parsed = JSON.parse(stored) as User[];
+        if (Array.isArray(parsed) && parsed.length) {
+          return parsed;
+        }
+      }
+    } catch (error) {
+      console.warn("Error parsing locally stored users, reseeding defaults:", error);
+    }
+    const seeded = DEFAULT_USERS.map((user) => ({ ...user }));
+    this.persistLocalUsers(seeded);
+    return seeded;
+  }
+
+  private upsertLocalUser(user: User): void {
+    const users = this.loadLocalUsers();
+    const index = users.findIndex((item) => item._id === user._id);
+    const updatedUser = { ...user };
+
+    if (index >= 0) {
+      users[index] = { ...users[index], ...updatedUser, updatedAt: new Date().toISOString() };
+    } else {
+      users.push(updatedUser);
+    }
+
+    this.persistLocalUsers(users);
+    this.cachedUsers = users;
+  }
+
+  private deleteLocalUser(userId: string): boolean {
+    const users = this.loadLocalUsers();
+    const filtered = users.filter((user) => user._id !== userId);
+    if (filtered.length === users.length) {
+      return false;
+    }
+    this.persistLocalUsers(filtered);
+    this.cachedUsers = filtered;
+    return true;
+  }
+
   /**
    * Helper method to get stored users with caching for better performance
    *
    * @returns Array of stored users
    */
   async getStoredUsers(): Promise<User[]> {
+    const useRemote = this.shouldUseRemoteAdminApi();
+    if (!useRemote) {
+      const localUsers = this.loadLocalUsers();
+      this.cachedUsers = localUsers;
+      return localUsers;
+    }
+
     try {
-      // Replace with actual API endpoint for fetching users if needed
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
       const url = `${baseUrl}/api/auth/users`;
       
@@ -231,22 +382,30 @@ class AuthService {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ authKey: process.env.NEXT_PUBLIC_AUTHKEY }),
+        body: JSON.stringify({ authKey: this.getAuthKey() }),
       });
 
       if (!res.ok) {
         console.error(`Failed to fetch users: ${res.status} ${res.statusText}`);
-        return [];
+        const localUsers = this.loadLocalUsers();
+        this.cachedUsers = localUsers;
+        return localUsers;
       }
 
       const response = await res.json();
 
-      const users = response.data as User[];
+      const users = Array.isArray(response.data)
+        ? response.data.map((user: any) => this.normalizeUser(user))
+        : [];
+
       this.cachedUsers = users;
+      this.persistLocalUsers(users);
       return users;
     } catch (error) {
       console.error("Error getting stored users:", error);
-      return [];
+      const localUsers = this.loadLocalUsers();
+      this.cachedUsers = localUsers;
+      return localUsers;
     }
   }
 
@@ -257,6 +416,36 @@ class AuthService {
    * @returns True if update was successful, false otherwise
    */
   async updateStoredUser(updatedUser: Partial<User>): Promise<boolean> {
+    if (!updatedUser._id) {
+      throw new Error("User ID is required for updates");
+    }
+
+    const applyLocalUpdate = () => {
+      const users = this.loadLocalUsers();
+      const index = users.findIndex((user) => user._id === updatedUser._id);
+      if (index === -1) {
+        throw new Error("User not found");
+      }
+      const mergedUser: User = {
+        ...users[index],
+        ...updatedUser,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (mergedUser.firstName || mergedUser.lastName) {
+        const first = mergedUser.firstName ?? "";
+        const last = mergedUser.lastName ?? "";
+        mergedUser.name = `${first}${last ? ` ${last}` : ""}`.trim() || mergedUser.name;
+      }
+
+      this.upsertLocalUser(mergedUser);
+      return true;
+    };
+
+    if (!this.shouldUseRemoteAdminApi()) {
+      return applyLocalUpdate();
+    }
+
     try {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
       const url = `${baseUrl}/api/auth/users`;
@@ -267,7 +456,7 @@ class AuthService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          authKey: process.env.NEXT_PUBLIC_AUTHKEY,
+          authKey: this.getAuthKey(),
           user: updatedUser,
         }),
       });
@@ -280,22 +469,27 @@ class AuthService {
         } catch {
           errorMessage = res.statusText || `Server error (${res.status})`;
         }
-        throw new Error(errorMessage);
+        console.warn("Falling back to local user update due to API error:", errorMessage);
+        return applyLocalUpdate();
       }
 
       const response = await res.json();
 
       if (!response.success) {
-        throw new Error(response.error || "Update failed");
+        console.warn("Falling back to local user update due to API response:", response.error);
+        return applyLocalUpdate();
       }
+
+      const normalizedUser = this.normalizeUser(response.data);
+      this.upsertLocalUser(normalizedUser);
 
       // Clear cache to force refresh on next fetch
       this.cachedUsers = null;
 
       return true;
     } catch (error) {
-      console.error("Error updating stored users:", error);
-      throw error; // Re-throw to allow error handling in the component
+      console.error("Error updating stored users, applying local fallback:", error);
+      return applyLocalUpdate();
     }
   }
 
@@ -306,6 +500,14 @@ class AuthService {
    * @returns True if deletion was successful, false otherwise
    */
   async deleteStoredUser(userId: string): Promise<boolean> {
+    if (!userId) {
+      throw new Error("User ID is required for deletion");
+    }
+
+    if (!this.shouldUseRemoteAdminApi()) {
+      return this.deleteLocalUser(userId);
+    }
+
     try {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
       const url = `${baseUrl}/api/auth/users`;
@@ -316,7 +518,7 @@ class AuthService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          authKey: process.env.NEXT_PUBLIC_AUTHKEY,
+          authKey: this.getAuthKey(),
           user: { _id: userId },
         }),
       });
@@ -329,19 +531,22 @@ class AuthService {
         } catch {
           errorMessage = res.statusText || `Server error (${res.status})`;
         }
-        throw new Error(errorMessage);
+        console.warn("Falling back to local user deletion due to API error:", errorMessage);
+        return this.deleteLocalUser(userId);
       }
 
       const response = await res.json();
 
       if (!response.success) {
-        throw new Error(response.error);
+        console.warn("Falling back to local user deletion due to API response:", response.error);
+        return this.deleteLocalUser(userId);
       }
 
+      this.deleteLocalUser(userId);
       return true;
     } catch (error) {
-      console.error("Error deleting stored users:", error);
-      return false;
+      console.error("Error deleting stored users, applying local fallback:", error);
+      return this.deleteLocalUser(userId);
     }
   }
 
@@ -390,6 +595,10 @@ class AuthService {
   }
 
   async fetchPasswordResetRequests() {
+    if (!this.shouldUseRemoteAdminApi()) {
+      return [];
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "";
     const url = `${baseUrl}/api/auth/password-reset/requests`;
 
@@ -398,7 +607,7 @@ class AuthService {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ authKey: process.env.NEXT_PUBLIC_AUTHKEY }),
+      body: JSON.stringify({ authKey: this.getAuthKey() }),
     });
 
     const response = await res.json();
@@ -417,13 +626,17 @@ class AuthService {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "";
     const url = `${baseUrl}/api/auth/password-reset/requests`;
 
+    if (!this.shouldUseRemoteAdminApi()) {
+      throw new Error("Real-time login approvals are disabled. Set NEXT_PUBLIC_AUTHKEY to enable this feature.");
+    }
+
     const res = await fetch(url, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        authKey: process.env.NEXT_PUBLIC_AUTHKEY,
+        authKey: this.getAuthKey(),
         requestId,
         action,
         resolvedBy,

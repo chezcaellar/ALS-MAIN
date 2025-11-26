@@ -710,62 +710,64 @@ function StudentActivitySummaryPageContent() {
       {/* Main Content Area */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg border-4 border-blue-600 dark:border-blue-500 mx-auto max-w-7xl">
         {/* Student Information Header */}
-        <div className="bg-gray-100 dark:bg-slate-700 px-4 sm:px-6 py-4 sm:py-5 rounded-t-lg border-b-4 border-blue-600 dark:border-blue-500">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-            {/* Left side - Back button, navigation, and student info */}
-            <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto flex-1 min-w-0">
-              {/* Back Arrow */}
-              <Button
-                onClick={handleBack}
-                variant="ghost"
-                size="sm"
-                className="bg-red-800 dark:bg-red-900 text-white hover:bg-red-900 dark:hover:bg-red-800 p-2 rounded flex-shrink-0"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+        <div className="px-3 sm:px-4 pt-3 sm:pt-4 border-b-4 border-blue-600 dark:border-blue-500">
+          <div className="bg-gray-100 dark:bg-slate-700 px-4 sm:px-6 py-4 sm:py-5 rounded-xl shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+              {/* Left side - Back button, navigation, and student info */}
+              <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto flex-1 min-w-0">
+                {/* Back Arrow */}
+                <Button
+                  onClick={handleBack}
+                  variant="ghost"
+                  size="sm"
+                  className="bg-red-800 dark:bg-red-900 text-white hover:bg-red-900 dark:hover:bg-red-800 p-2 rounded flex-shrink-0"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
 
-              {/* Student Image */}
-              <div className="relative h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
-                {student.image ? (
-                  <Image
-                    src={student.image}
-                    alt={student.name}
-                    fill
-                    style={{ objectFit: "cover" }}
-                    className="rounded-full"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                    }}
-                  />
-                ) : null}
-                {/* Initials fallback */}
-                <span className="text-gray-600 dark:text-gray-300 font-bold text-sm sm:text-base">
-                  {student.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .substring(0, 2)
-                    .toUpperCase()}
-                </span>
+                {/* Student Image */}
+                <div className="relative h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                  {student.image ? (
+                    <Image
+                      src={student.image}
+                      alt={student.name}
+                      fill
+                      style={{ objectFit: "cover" }}
+                      className="rounded-full"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                      }}
+                    />
+                  ) : null}
+                  {/* Initials fallback */}
+                  <span className="text-gray-600 dark:text-gray-300 font-bold text-sm sm:text-base">
+                    {student.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .substring(0, 2)
+                      .toUpperCase()}
+                  </span>
+                </div>
+
+                {/* Student Details */}
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white uppercase truncate">
+                    {student.name}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium truncate">
+                    {student.lrn}
+                  </p>
+                </div>
               </div>
 
-              {/* Student Details */}
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white uppercase truncate">
-                  {student.name}
-                </h2>
-                <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium truncate">
-                  {student.lrn}
+              {/* Right side - Program info */}
+              <div className="text-left sm:text-right w-full sm:w-auto sm:flex-shrink-0 pl-14 sm:pl-0">
+                <p className="text-sm sm:text-base text-gray-900 dark:text-white font-medium">
+                  {student.program}
                 </p>
               </div>
-            </div>
-
-            {/* Right side - Program info */}
-            <div className="text-left sm:text-right w-full sm:w-auto sm:flex-shrink-0 pl-14 sm:pl-0">
-              <p className="text-sm sm:text-base text-gray-900 dark:text-white font-medium">
-                {student.program}
-              </p>
             </div>
           </div>
         </div>

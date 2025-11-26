@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStudentStore } from '@/store/student-store';
 import { useAuthStoreState } from '@/store/auth-store';
+import { ALL_BARANGAYS_ID, ALL_BARANGAYS_LABEL } from '@/store/constants';
 import { Student } from '@/types';
 import { StudentFormValues } from '@/validators/student-validators';
 
@@ -154,6 +155,9 @@ export default function StudentsPage() {
           barangays={filteredBarangays}
           selectedBarangay={selectedBarangay}
           onSelectBarangay={setSelectedBarangay}
+          showAllOption={user?.role !== 'admin'}
+          allOptionValue={ALL_BARANGAYS_ID}
+          allOptionLabel={ALL_BARANGAYS_LABEL}
         />
       )}
 

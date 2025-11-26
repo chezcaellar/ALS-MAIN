@@ -21,6 +21,8 @@ export function PasswordResetNotifications({
   isMasterAdmin,
   onPendingChange,
 }: PasswordResetNotificationsProps) {
+  const realtimeConfigured = Boolean(process.env.NEXT_PUBLIC_AUTHKEY?.trim());
+  const isRealtimeEnabled = isMasterAdmin && realtimeConfigured;
   const [requests, setRequests] = useState<PasswordResetRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function PasswordResetNotifications({
   const isInitialLoadRef = useRef(true);
 
   const loadRequests = useCallback(async (silent = false) => {
-    if (!isMasterAdmin) {
+    if (!isRealtimeEnabled) {
       setRequests([]);
       onPendingChange?.(false);
       return;
@@ -83,22 +85,32 @@ export function PasswordResetNotifications({
         setIsLoading(false);
       }
     }
-  }, [isMasterAdmin, onPendingChange]);
+  }, [isRealtimeEnabled, onPendingChange]);
 
   // Request notification permission on mount
   useEffect(() => {
-    if (isMasterAdmin && "Notification" in window && Notification.permission === "default") {
+    if (isRealtimeEnabled && "Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().catch(console.error);
     }
-  }, [isMasterAdmin]);
+  }, [isRealtimeEnabled]);
 
   // Initial load
   useEffect(() => {
     loadRequests();
-  }, [isMasterAdmin, loadRequests]);
+  }, [isRealtimeEnabled, loadRequests]);
 
   // Set up real-time polling
   useEffect(() => {
+    if (!isRealtimeEnabled) {
+      // Clear polling if disabled
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      setIsPolling(false);
+      return;
+    }
+
     if (!isMasterAdmin) {
       // Clear polling if not master admin
       if (pollingIntervalRef.current) {
@@ -151,7 +163,7 @@ export function PasswordResetNotifications({
       stopPolling();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isMasterAdmin, loadRequests]);
+  }, [isMasterAdmin, isRealtimeEnabled, loadRequests]);
 
   const handleAction = async (requestId: string, action: "accept" | "reject") => {
     setUpdatingId(requestId);
@@ -193,6 +205,28 @@ export function PasswordResetNotifications({
         <CardContent>
           <p className="text-sm text-gray-600 dark:text-gray-300">
             Please contact the master admin for password reset approvals.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!realtimeConfigured) {
+    return (
+      <Card className="bg-white dark:bg-slate-800 border-4 border-blue-600 dark:border-blue-500">
+        <CardHeader>
+          <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Password Reset Notifications
+          </CardTitle>
+          <CardDescription className="text-gray-600 dark:text-gray-300">
+            Real-time login approval notifications are disabled because the master authentication key
+            (`NEXT_PUBLIC_AUTHKEY`) is not configured. Admin management will continue to work with local data.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Set the environment variable and redeploy once you are ready to enable live approvals.
           </p>
         </CardContent>
       </Card>

@@ -207,7 +207,7 @@ export function AddCustomModuleDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto border-4 border-blue-600">
+      <DialogContent hideCloseButton className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto border-4 border-blue-600">
         <DialogHeader className="bg-blue-600 text-white p-4 -m-6 mb-4 rounded-t-lg sticky top-0 z-10">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-lg font-bold">

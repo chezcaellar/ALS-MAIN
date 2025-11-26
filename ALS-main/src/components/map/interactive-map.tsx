@@ -6,6 +6,7 @@ import L from 'leaflet';
 import { SafeMapContainer } from './safe-map-container';
 import { Barangay } from '@/types';
 import { useOnlineStatus } from '@/hooks/use-online-status';
+import { ALL_BARANGAYS_ID } from '@/store/constants';
 import { OfflineTileLayer } from './offline-tile-layer';
 import { NetworkStatusIndicator } from './network-status-indicator';
 import {
@@ -77,10 +78,12 @@ export function InteractiveMap({
   }, []); // Empty dependency array ensures this is only generated once
 
   // Find the selected barangay or default to center of Indang, Cavite
-  const selectedBarangayData = useMemo(() =>
-    selectedBarangay ? barangays.find(b => b._id === selectedBarangay) : null,
-    [selectedBarangay, barangays]
-  );
+  const selectedBarangayData = useMemo(() => {
+    if (!selectedBarangay || selectedBarangay === ALL_BARANGAYS_ID) {
+      return null;
+    }
+    return barangays.find(b => b._id === selectedBarangay) || null;
+  }, [selectedBarangay, barangays]);
 
   const mapCenter: [number, number] = useMemo(() =>
     selectedBarangayData && selectedBarangayData.latitude && selectedBarangayData.longitude

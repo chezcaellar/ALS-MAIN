@@ -11,6 +11,7 @@ import {
   updateStudent,
   deleteStudent
 } from '@/services/api';
+import { ALL_BARANGAYS_ID } from './constants';
 
 // Initial state
 const initialState: StudentState = {
@@ -53,7 +54,7 @@ export const useStudentStore = create<{
     students: initialState,
     barangays: [],
     searchQuery: '',
-    selectedBarangay: null, // Will be set to first barangay when barangays are loaded
+    selectedBarangay: ALL_BARANGAYS_ID, // Master admins default to all barangays
     loadingBarangays: false,
     errorBarangays: null,
 
@@ -115,20 +116,17 @@ export const useStudentStore = create<{
           state.loadingBarangays = false;
 
           // Smart barangay selection based on user role
-          if (!state.selectedBarangay && barangays.length > 0) {
-            if (user?.role === 'admin' && user?.assignedBarangayId) {
-              // For Regular Admin: select their assigned barangay
-              const assignedBarangay = barangays.find(b => b._id === user.assignedBarangayId);
-              if (assignedBarangay) {
-                state.selectedBarangay = assignedBarangay._id;
-              } else {
-                // Fallback to first barangay if assigned barangay not found
-                state.selectedBarangay = barangays[0]._id;
-              }
-            } else {
-              // For Master Admin or no user: select first barangay
+          if (user?.role === 'admin' && user?.assignedBarangayId) {
+            const assignedBarangay = barangays.find(b => b._id === user.assignedBarangayId);
+            if (assignedBarangay) {
+              state.selectedBarangay = assignedBarangay._id;
+            } else if (barangays.length > 0) {
               state.selectedBarangay = barangays[0]._id;
+            } else {
+              state.selectedBarangay = null;
             }
+          } else if (!state.selectedBarangay || state.selectedBarangay === '') {
+            state.selectedBarangay = ALL_BARANGAYS_ID;
           }
         });
 
@@ -167,7 +165,7 @@ export const useStudentStore = create<{
         let filtered = students.data;
 
         // Always filter by barangay (since one is always selected now)
-        if (selectedBarangay) {
+        if (selectedBarangay && selectedBarangay !== ALL_BARANGAYS_ID) {
           filtered = filtered.filter(student => student.barangayId === selectedBarangay);
         }
 

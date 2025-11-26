@@ -15,6 +15,7 @@ import {
   fetchProgress,
   fetchModules,
 } from "@/services/api";
+import { ALL_BARANGAYS_ID } from "./constants";
 
 // Initial state
 const initialState: ProgressState = {
@@ -78,7 +79,7 @@ export const useProgressStore = create<{
     students: [],
     barangays: [],
     searchQuery: "",
-    selectedBarangay: null,
+    selectedBarangay: ALL_BARANGAYS_ID,
     loadingBarangays: false,
     loadingStudents: false,
     errorBarangays: null,
@@ -159,22 +160,22 @@ export const useProgressStore = create<{
           state.loadingBarangays = false;
 
           // Smart barangay selection based on user role
-          if (!state.selectedBarangay && barangaysData.length > 0) {
-            if (user?.role === "admin" && user?.assignedBarangayId) {
-              // For Regular Admin: select their assigned barangay
-              const assignedBarangay = barangaysData.find(
-                (b) => b._id === user.assignedBarangayId
-              );
-              if (assignedBarangay) {
-                state.selectedBarangay = assignedBarangay._id;
-              } else {
-                // Fallback to first barangay if assigned barangay not found
-                state.selectedBarangay = barangaysData[0]._id;
-              }
-            } else {
-              // For Master Admin or no user: select first barangay
+          if (user?.role === "admin" && user?.assignedBarangayId) {
+            const assignedBarangay = barangaysData.find(
+              (b) => b._id === user.assignedBarangayId
+            );
+            if (assignedBarangay) {
+              state.selectedBarangay = assignedBarangay._id;
+            } else if (barangaysData.length > 0) {
               state.selectedBarangay = barangaysData[0]._id;
+            } else {
+              state.selectedBarangay = null;
             }
+          } else if (
+            !state.selectedBarangay ||
+            state.selectedBarangay === ""
+          ) {
+            state.selectedBarangay = ALL_BARANGAYS_ID;
           }
         });
 
@@ -214,7 +215,7 @@ export const useProgressStore = create<{
       let filtered = [...students];
 
       // Filter by barangay
-      if (selectedBarangay) {
+      if (selectedBarangay && selectedBarangay !== ALL_BARANGAYS_ID) {
         filtered = filtered.filter(
           (student) => student.barangayId === selectedBarangay
         );
@@ -246,7 +247,7 @@ export const useProgressStore = create<{
       let filtered = [...students];
 
       // Filter by barangay - only show students from selected barangay in masterlist
-      if (selectedBarangay) {
+      if (selectedBarangay && selectedBarangay !== ALL_BARANGAYS_ID) {
         filtered = filtered.filter(
           (student) => student.barangayId === selectedBarangay
         );

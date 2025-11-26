@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useSearchStore } from '@/store/search-store';
+import { ALL_BARANGAYS_ID } from '@/store/constants';
 
 interface ProgressTableProps {
   students: Student[];
@@ -33,7 +34,7 @@ export function ProgressTable({
     let filtered = [...students];
 
     // Filter by barangay
-    if (selectedBarangay) {
+    if (selectedBarangay && selectedBarangay !== ALL_BARANGAYS_ID) {
       filtered = filtered.filter(student => student.barangayId === selectedBarangay);
     }
 
