@@ -69,7 +69,8 @@ export function AddCustomModuleDialog({
     'Activity',
     'Project',
     'Participation',
-    'Assessment'
+    'Assessment',
+    'Examination'
   ];
 
   // Reset or prefill form depending on context
